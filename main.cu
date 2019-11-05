@@ -7,6 +7,37 @@
 # define FILL_PERCENT 10
 # define SIZE 500
 # define BLOCK_SIZE 32
+
+
+__global__ void
+_cl_matrix_vector_( int *M, int *V, int *x)
+{
+    extern __shared__ int vec[];
+    unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int temp = 0,i;
+    int vOffs = 0;
+
+    //load vector into shared memory
+    for (i = 0; i < (SIZE/blockDim.x) + 1 ; ++i, vOffs+= blockDim.x) {
+        vec[vOffs + threadIdx.x] = V[vOffs + threadIdx.x];
+    }
+
+    //make sure all threads are synchronized
+     __syncthreads();
+
+    if (idx < SIZE) {
+        temp = 0.0;
+        //dot product (multiplication)
+        for (i = 0; i < SIZE; i++){
+            temp += M[idx * SIZE + i] * vec[i];
+        }
+         x[idx] = temp;
+    } 
+
+}
+
+
+
 //generate spmv
 
 
