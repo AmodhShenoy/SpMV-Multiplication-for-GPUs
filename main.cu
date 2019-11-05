@@ -41,6 +41,7 @@ int main(){
 	//variable declarations
 	int i,j,k,iter;
 	int **M,*V;
+	int *ro,*ci,*val,*dd;
 
 	for(iter=0;iter<NUM_ITERS;iter++){
 		//allocating SpMV
@@ -71,6 +72,33 @@ int main(){
 			v[i] = (rand() % 100) + 1;
 
 		printf("Done\n");
+
+
+		//Building CSR and ECSR rep of SpM
+		printf("Building CSR vectors and Distance Difference vector...");
+		int cct = 0;
+		int prev = 0;
+		ro = (int *)malloc((SIZE + 1)*sizeof(int));
+		ci = (int *)malloc(non_zero_ct * sizeof(int));
+		val = (int *)malloc(non_zero_ct * sizeof(int));
+		ro[0] = 0;
+
+		dd = (int *)malloc(non_zero_ct * sizeof(int)/2);
+
+		for(i=0;i<SIZE;i++){
+			for(j=0;j<SIZE;j++){
+				if(M[i][j]!=0){
+					ci[cct] = j;
+					val[cct] = M[i][j];
+					dd[cct] = j - prev;
+					prev = j;
+					cct++;
+				}
+			}
+			ro[i+1] = cct;
+		}
+		printf("Done\n");
+
 
 
 
