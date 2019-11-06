@@ -9,48 +9,53 @@
 # define BLOCK_SIZE 32
 
 
-__global__ void spmvNormal( int *M, int *V, int *x){
+__global__ void spmvNormal( int *M, int *V, int *res){
     unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    int temp = 0,i;
-
-    //load vector into shared memory
-    //for (i = 0; i < (SIZE/blockDim.x) + 1 ; ++i, vOffs+= blockDim.x) {
-    //    vec[vOffs + threadIdx.x] = V[vOffs + threadIdx.x];
-    //}
-
-    //make sure all threads are synchronized
-    // __syncthreads();
-
+    int temp,i;
     if (idx < SIZE) {
-        temp = 0.0;
-        //dot product (multiplication)
+    	temp = 0;
+        //dot product for one row
         for (i = 0; i < SIZE; i++){
             temp += M[idx * SIZE + i] * V[i];
         }
-         x[idx] = temp;
+         res[idx] = temp;
     } 
     __syncthreads();
 }
 
-__global__ void spmvCSR(int *ro, int *ci,int *val, int *V, int* res){
-	int row = blockIdx.x * blockDim.x + threadIdx.x;
+__global__ void spmvCSR(int *ro, int *ci,int *val, int *V, int* res_csr){
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	int i;
-	int row_start, row_end;
+	int start, end;
 	int dot;
-	if(row < SIZE){
+	if(idx < SIZE){
 		dot = 0;
-		row_start = ro[row];
-		row_end = ro[row + 1];
-		for(i = row_start; i < row_end; i++){
+		start = ro[row];
+		end = ro[row + 1];
+		for(i = start; i < end; i++){
 			dot+= val[i] * V[ci[i]];
 		}
 	}
-	res[row] += dot;
+	res_csr[idx] = dot;
 }
 
 
-__global__ void spmvECSR(int *ro, int *dd, int *val, int *V, int *res){
-	
+__global__ void spmvECSR(int *ro, int *dd, int *val, int *V, int *res_ecsr){
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	int i,j;
+	int start, end;
+	int dot;
+	if(idx < SIZE){
+		dot = 0;
+		start = ro[row];
+		end = ro[row + 1];
+		j = dd[start];
+		res_ecsr[idx] = val[start] * V[j];
+		for(i = start+1; i < end; i++){
+			dot+= val[i] * V[j+dd[i]];
+		}
+	}
+	res_csr[idx] = dot;
 }
 
 int main(){
@@ -112,6 +117,7 @@ int main(){
 		dd = (int *)malloc(non_zero_ct *1.5* sizeof(int)/2);
 
 		for(i=0;i<SIZE;i++){
+			int flag = 0;
 			for(j=0;j<SIZE;j++){
 				if(M[i][j]!=0){					
 					while(j-prev<255){
@@ -120,10 +126,16 @@ int main(){
 						dd[cct] = 255;
 						prev = prev + 255;
 						cct++;
-					}					
+					}
+
 					ci[cct] = j;
 					val[cct] = M[i][j];
-					dd[cct] = j - prev;
+					if(flag==0){
+						dd[cct] = j;
+						flag++;
+					}
+					else
+						dd[cct] = j - prev;
 					prev = j;
 					cct++;
 				}
