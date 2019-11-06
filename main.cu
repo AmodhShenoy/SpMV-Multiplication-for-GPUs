@@ -32,8 +32,20 @@ __global__ void spmvNormal( int *M, int *V, int *x){
     __syncthreads();
 }
 
-__global__ void spmvCSR(int *ro, int *ci, int *val, int *V, int *res){
-	
+__global__ void spmvCSR(int *ro, int *ci,int *val, int *V, int* res){
+	int row = blockIdx.x * blockDim.x + threadIdx.x;
+	int i;
+	int row_start, row_end;
+	int dot;
+	if(row < SIZE){
+		dot = 0;
+		row_start = ro[row];
+		row_end = ro[row + 1];
+		for(i = row_start; i < row_end; i++){
+			dot+= val[i] * V[ci[i]];
+		}
+	}
+	res[row] += dot;
 }
 
 
@@ -139,7 +151,7 @@ int main(){
 		cudaMemcpy(V_gpu, V, (SIZE * sizeof(int)), cudaMemcpyHostToDevice);
 
 		//setting CUDA parameters
-		int nb = (int)(SIZE/BLOCK_SIZE) + 10;
+		int nb = ceil(SIZE/BLOCK_SIZE);
 		int nt = BLOCK_SIZE;
 
 		//Starting Normal Multiplication
