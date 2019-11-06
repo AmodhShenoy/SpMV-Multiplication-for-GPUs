@@ -9,63 +9,37 @@
 # define BLOCK_SIZE 32
 
 
-__global__ void
-_cl_matrix_vector_( int *M, int *V, int *x)
-{
-    extern __shared__ int vec[];
+__global__ void spmvNormal( int *M, int *V, int *x){
     unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int temp = 0,i;
-    int vOffs = 0;
 
     //load vector into shared memory
-    for (i = 0; i < (SIZE/blockDim.x) + 1 ; ++i, vOffs+= blockDim.x) {
-        vec[vOffs + threadIdx.x] = V[vOffs + threadIdx.x];
-    }
+    //for (i = 0; i < (SIZE/blockDim.x) + 1 ; ++i, vOffs+= blockDim.x) {
+    //    vec[vOffs + threadIdx.x] = V[vOffs + threadIdx.x];
+    //}
 
     //make sure all threads are synchronized
-     __syncthreads();
+    // __syncthreads();
 
     if (idx < SIZE) {
         temp = 0.0;
         //dot product (multiplication)
         for (i = 0; i < SIZE; i++){
-            temp += M[idx * SIZE + i] * vec[i];
+            temp += M[idx * SIZE + i] * V[i];
         }
          x[idx] = temp;
     } 
+    __syncthreads();
+}
 
+__global__ void spmvCSR(int *ro, int *ci, int *val, int *V, int *res){
+	
 }
 
 
-
-//generate spmv
-
-
-
-//make csr
-
-
-
-//make ecsr
-
-
-
-//normal multiplication
-
-
-
-//csr multiplication
-
-
-//ecsr multiplication
-
-
-
-//cost function
-
-
-//comparison
-
+__global__ void spmvECSR(int *ro, int *dd, int *val, int *V, int *res){
+	
+}
 
 int main(){
 	cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
@@ -74,10 +48,10 @@ int main(){
 	int i,j,k,iter;
 	int **M,*V;
 	int *ro,*ci,*val,*dd;
-	int *ro_gpu,*ci_gpu,*val_gpu,*dd_gpu,*V_gpu;
-	int *res_csr,*res_ecsr;
-	int *res_csr_gpu, *res_ecsr_gpu;
-	double total_csr,total_ecsr;
+	int *ro_gpu,*ci_gpu,*val_gpu,*dd_gpu,*V_gpu,*M_gpu;
+	int *res_csr,*res_ecsr,*res;
+	int *res_csr_gpu, *res_ecsr_gpu,*res_gpu;
+	double total_csr=0,total_ecsr=0,total_normal=0;
 
 	// Define CudaError
     cudaError_t err;
@@ -147,6 +121,7 @@ int main(){
 		printf("Done\n");
 
 		//Setup memory on GPU
+		cudaMalloc((void **)&M_gpu,(SIZE * sizeof(int))*(SIZE));
 		cudaMalloc((void **)&ro_gpu, (SIZE + 1)*sizeof(int));
 		cudaMalloc((void **)&ci_gpu, (non_zero_ct * 1.5 * sizeof(int)));
 		cudaMalloc((void **)&val_gpu, (non_zero_ct * 1.5 * sizeof(int)));
@@ -156,6 +131,7 @@ int main(){
 		cudaMalloc((void **)&res_ecsr_gpu, (SIZE * sizeof(int)));
 
 		//transfer to device
+		cudaMemcpy(M_gpu, M, (SIZE * SIZE * sizeof(int)), cudaMemcpyHostToDevice);
 		cudaMemcpy(ro_gpu, ro, (SIZE +1)*sizeof(int),cudaMemcpyHostToDevice);
 		cudaMemcpy(ci_gpu, ci , (non_zero_ct * 1.5 * sizeof(int)), cudaMemcpyHostToDevice);
 		cudaMemcpy(val_gpu, val, (non_zero_ct * 1.5 * sizeof(int)),cudaMemcpyHostToDevice);
@@ -163,8 +139,30 @@ int main(){
 		cudaMemcpy(V_gpu, V, (SIZE * sizeof(int)), cudaMemcpyHostToDevice);
 
 		//setting CUDA parameters
-		nb = SIZE/BLOCK_SIZE * 32;
-		nt = BLOCK_SIZE;
+		int nb = (int)(SIZE/BLOCK_SIZE) + 10;
+		int nt = BLOCK_SIZE;
+
+		//Starting Normal Multiplication
+		printf("\n\nStarting Normal Multiplication...");
+		clock_t start,end;
+		start = clock();
+
+		spmvNormal<<< nb,nt >>>(M_gpu,V_gpu,res_gpu);
+
+		end = clock();
+		total_normal += end - start;
+
+		//Checking for CUDA errors
+		err = cudaGetLastError();
+		if(err!=cudaSuccess){
+			printf("ERROR: %s\n",cudaGetErrorString(err));
+			exit(0);
+		}
+		printf("Done\n");
+
+		//Transfer result back to memory
+		cudaMemcpy(res, res_gpu, (SIZE * sizeof(int)), cudaMemcpyDeviceToHost);
+
 
 		//Starting CSR Multiplication
 		printf("\n\nStarting CSR Multiplication...");
