@@ -252,10 +252,17 @@ int main(){
 		printf("===============================================================================\n");
 	}
 
+	double avg = total_normal/NUM_ITERS;
 	double avg_csr = total_csr/NUM_ITERS;
 	double avg_ecsr = total_ecsr/NUM_ITERS;
+	printf("Average time taken for normal multiplication:%lf\n",avg);
+	printf("---------------------------------------------------------------");
 	printf("Average time taken for CSR multiplication:%lf\n",avg_csr);
+	printf("CSR multiplication runs %lf times faster than normal multiplication\n",avg/avg_csr);
+	printf("---------------------------------------------------------------");
 	printf("Average time taken for ECSR multiplication:%lf\n",avg_ecsr);
+	printf("ECSR multiplication runs %lf times faster than normal multiplication\n",avg/avg_ecsr);
+	printf("---------------------------------------------------------------");
 	printf("It is seen that time taken for CSR multiplication is %lf times that for ECSR multiplication\n",avg_csr/avg_ecsr);
 
 	return 0;
